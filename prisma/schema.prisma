@@ -1,0 +1,472 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime? @db.Timestamp(6)
+  refreshTokenExpiresAt DateTime? @db.Timestamp(6)
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt             DateTime  @db.Timestamp(6)
+  user                  user      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model admin_otp_verification {
+  id         String   @id @default(dbgenerated("gen_random_uuid()"))
+  admin_id   String
+  email      String   @db.VarChar(255)
+  otp_code   String   @db.VarChar(6)
+  purpose    String   @db.VarChar(50)
+  expires_at DateTime @db.Timestamptz(6)
+  is_used    Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  admins     admins   @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+
+  @@index([admin_id])
+  @@index([email, purpose, is_used])
+  @@index([otp_code, expires_at])
+  @@index([email], map: "idx_admin_otp_email")
+  @@index([expires_at], map: "idx_admin_otp_expires")
+}
+
+model admin_sessions {
+  id            String   @id @default(dbgenerated("gen_random_uuid()"))
+  admin_id      String
+  session_token String
+  expires_at    DateTime @db.Timestamptz(6)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  ip_address    String?
+  user_agent    String?
+  admins        admins   @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+
+  @@index([admin_id])
+  @@index([expires_at])
+  @@index([session_token])
+  @@index([expires_at], map: "idx_admin_sessions_expires")
+  @@index([session_token], map: "idx_admin_sessions_token")
+}
+
+model admins {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()"))
+  email                  String                   @db.VarChar(255)
+  password_hash          String
+  role                   admin_role               @default(admin)
+  first_name             String                   @db.VarChar(100)
+  last_name              String                   @db.VarChar(100)
+  is_active              Boolean                  @default(true)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  created_by             String?
+  last_login             DateTime?                @db.Timestamptz(6)
+  admin_otp_verification admin_otp_verification[]
+  admin_sessions         admin_sessions[]
+  admins                 admins?                  @relation("adminsToadmins", fields: [created_by], references: [id])
+  other_admins           admins[]                 @relation("adminsToadmins")
+
+  @@index([created_at])
+  @@index([email])
+  @@index([is_active])
+  @@index([role])
+  @@index([email], map: "idx_admins_email")
+  @@index([is_active], map: "idx_admins_is_active")
+}
+
+model contact_form_submissions {
+  id           BigInt   @id
+  first_name   String   @db.VarChar(50)
+  last_name    String?  @db.VarChar(50)
+  email        String   @db.VarChar(254)
+  subject      String   @db.VarChar(500)
+  message      String
+  inquiry_type String   @db.VarChar(50)
+  status       String   @default("new") @db.VarChar(20)
+  user_id      String?
+  ip_address   String?  @db.VarChar(45)
+  user_agent   String?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+  response     String?
+  responsed_by String?
+  user         user?    @relation(fields: [user_id], references: [id])
+
+  @@index([created_at])
+  @@index([email])
+  @@index([inquiry_type])
+  @@index([status])
+  @@index([user_id])
+}
+
+model daily_test_clicks {
+  id          BigInt   @id
+  user_id     String?
+  book        String
+  module      String
+  ip_address  String?
+  test_number Int
+  click_date  DateTime @db.Date
+  click_count Int      @default(1)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  user        user?    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([book, module, test_number])
+  @@index([user_id, click_date])
+}
+
+model newsletter_subscriptions {
+  id                 BigInt    @id
+  email              String    @db.VarChar(254)
+  status             String    @default("active") @db.VarChar(20)
+  subscription_date  DateTime  @default(now()) @db.Timestamptz(6)
+  unsubscribe_date   DateTime? @db.Timestamptz(6)
+  user_id            String?
+  ip_address         String?   @db.VarChar(45)
+  user_agent         String?
+  confirmation_token String?   @db.VarChar(64)
+  confirmed_at       DateTime? @db.Timestamptz(6)
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
+  user               user?     @relation(fields: [user_id], references: [id])
+
+  @@index([confirmation_token])
+  @@index([email])
+  @@index([status])
+  @@index([subscription_date])
+  @@index([user_id])
+}
+
+model otp_verifications {
+  id        BigInt   @id
+  userId    String
+  email     String
+  otpCode   String
+  purpose   String   @default("password_reset")
+  expiresAt DateTime @db.Timestamptz(6)
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, purpose, isUsed])
+  @@index([otpCode, expiresAt])
+  @@index([userId])
+}
+
+model scheduled_speaking_requests {
+  id                                                 String    @id @default(dbgenerated("gen_random_uuid()"))
+  sender_id                                          String
+  receiver_id                                        String
+  scheduled_date                                     DateTime  @db.Date
+  scheduled_time                                     DateTime  @db.Time(6)
+  scheduled_datetime                                 DateTime? @db.Timestamptz(6)
+  timezone                                           String    @default("UTC") @db.VarChar(100)
+  status                                             String    @default("pending") @db.VarChar(20)
+  message                                            String?
+  created_at                                         DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at                                         DateTime  @default(now()) @db.Timestamptz(6)
+  responded_at                                       DateTime? @db.Timestamptz(6)
+  sender_ready_at                                    DateTime? @db.Timestamptz(6)
+  receiver_ready_at                                  DateTime? @db.Timestamptz(6)
+  started_at                                         DateTime? @db.Timestamptz(6)
+  completed_at                                       DateTime? @db.Timestamptz(6)
+  room_code                                          String?   @db.VarChar(20)
+  expires_at                                         DateTime? @db.Timestamptz(6)
+  user_scheduled_speaking_requests_receiver_idTouser user      @relation("scheduled_speaking_requests_receiver_idTouser", fields: [receiver_id], references: [id], onDelete: Cascade)
+  user_scheduled_speaking_requests_sender_idTouser   user      @relation("scheduled_speaking_requests_sender_idTouser", fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([expires_at])
+  @@index([receiver_id])
+  @@index([scheduled_datetime])
+  @@index([sender_id])
+  @@index([status])
+}
+
+model session {
+  id        String   @id
+  expiresAt DateTime @db.Timestamp(6)
+  token     String
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @db.Timestamp(6)
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model speaking_evaluation_data {
+  id                 BigInt   @id
+  userId             String?
+  topic              String
+  questions          String
+  userAnswer         String
+  evaluationResponse String
+  recordingDuration  Int
+  urlLink            String?
+  createdAt          DateTime @default(now()) @db.Timestamptz(6)
+  isLoggedIn         Boolean? @default(false)
+  user               user?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([topic])
+  @@index([userId])
+}
+
+model speaking_requests {
+  id                                       BigInt   @id
+  sender_id                                String
+  receiver_id                              String
+  status                                   String   @default("pending")
+  created_at                               DateTime @default(now()) @db.Timestamptz(6)
+  expires_at                               DateTime @db.Timestamptz(6)
+  user_speaking_requests_receiver_idTouser user     @relation("speaking_requests_receiver_idTouser", fields: [receiver_id], references: [id], onDelete: Cascade)
+  user_speaking_requests_sender_idTouser   user     @relation("speaking_requests_sender_idTouser", fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([expires_at])
+  @@index([receiver_id])
+  @@index([sender_id])
+  @@index([status])
+}
+
+model speaking_room_invitations {
+  id                                              String         @id @default(dbgenerated("gen_random_uuid()"))
+  room_id                                         String
+  inviter_id                                      String
+  invitee_id                                      String
+  status                                          String         @default("pending") @db.VarChar(20)
+  created_at                                      DateTime       @default(now()) @db.Timestamptz(6)
+  expires_at                                      DateTime       @db.Timestamptz(6)
+  responded_at                                    DateTime?      @db.Timestamptz(6)
+  message                                         String?
+  user_speaking_room_invitations_invitee_idTouser user           @relation("speaking_room_invitations_invitee_idTouser", fields: [invitee_id], references: [id], onDelete: Cascade)
+  user_speaking_room_invitations_inviter_idTouser user           @relation("speaking_room_invitations_inviter_idTouser", fields: [inviter_id], references: [id], onDelete: Cascade)
+  speaking_rooms                                  speaking_rooms @relation(fields: [room_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([expires_at])
+  @@index([invitee_id])
+  @@index([inviter_id])
+  @@index([room_id])
+  @@index([status])
+}
+
+model speaking_room_likes {
+  id                                           String         @id @default(dbgenerated("gen_random_uuid()"))
+  room_id                                      String
+  liker_id                                     String
+  liked_user_id                                String
+  created_at                                   DateTime       @default(now()) @db.Timestamptz(6)
+  user_speaking_room_likes_liked_user_idTouser user           @relation("speaking_room_likes_liked_user_idTouser", fields: [liked_user_id], references: [id], onDelete: Cascade)
+  user_speaking_room_likes_liker_idTouser      user           @relation("speaking_room_likes_liker_idTouser", fields: [liker_id], references: [id], onDelete: Cascade)
+  speaking_rooms                               speaking_rooms @relation(fields: [room_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([liked_user_id])
+  @@index([liker_id])
+  @@index([room_id])
+}
+
+model speaking_room_messages {
+  id                                            String   @id @default(dbgenerated("gen_random_uuid()"))
+  room_code                                     String   @db.VarChar(20)
+  sender_id                                     String
+  receiver_id                                   String?
+  message_text                                  String
+  message_type                                  String   @default("text") @db.VarChar(20)
+  is_private                                    Boolean  @default(false)
+  is_read                                       Boolean  @default(false)
+  created_at                                    DateTime @default(now()) @db.Timestamptz(6)
+  user_speaking_room_messages_receiver_idTouser user?    @relation("speaking_room_messages_receiver_idTouser", fields: [receiver_id], references: [id], onDelete: Cascade)
+  user_speaking_room_messages_sender_idTouser   user     @relation("speaking_room_messages_sender_idTouser", fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([is_private])
+  @@index([is_read])
+  @@index([receiver_id])
+  @@index([room_code])
+  @@index([sender_id])
+}
+
+model speaking_room_participants {
+  id             String         @id @default(dbgenerated("gen_random_uuid()"))
+  room_id        String
+  user_id        String
+  role           String         @default("participant") @db.VarChar(20)
+  joined_at      DateTime       @default(now()) @db.Timestamptz(6)
+  left_at        DateTime?      @db.Timestamptz(6)
+  is_online      Boolean        @default(true)
+  invite_id      String?
+  speaking_rooms speaking_rooms @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user           user           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([is_online])
+  @@index([joined_at])
+  @@index([role])
+  @@index([room_id])
+  @@index([user_id])
+}
+
+model speaking_rooms {
+  id                         String                       @id @default(dbgenerated("gen_random_uuid()"))
+  room_code                  String                       @db.VarChar(20)
+  creator_id                 String
+  status                     String                       @default("active") @db.VarChar(20)
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  started_at                 DateTime?                    @db.Timestamptz(6)
+  ended_at                   DateTime?                    @db.Timestamptz(6)
+  duration_seconds           Int?                         @default(0)
+  agora_channel_name         String?                      @db.VarChar(100)
+  max_participants           Int                          @default(10)
+  room_type                  String                       @default("instant") @db.VarChar(20)
+  scheduled_request_id       String?
+  speaking_room_invitations  speaking_room_invitations[]
+  speaking_room_likes        speaking_room_likes[]
+  speaking_room_participants speaking_room_participants[]
+  user                       user                         @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+
+  @@index([agora_channel_name])
+  @@index([created_at])
+  @@index([creator_id])
+  @@index([room_code])
+  @@index([room_type])
+  @@index([status])
+}
+
+model test_scores {
+  id               BigInt   @id
+  userId           String?
+  book             String
+  module           String
+  test_number      Int
+  score            Int
+  total_questions  Int?
+  percentage       Float?
+  ielts_band_score Float?
+  time_taken       Int?
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+  user             user?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([book, module, test_number])
+  @@index([createdAt])
+  @@index([ielts_band_score])
+  @@index([module, score])
+  @@index([userId])
+  @@index([userId, module])
+}
+
+model user {
+  id                                                                        String                        @id
+  name                                                                      String
+  email                                                                     String
+  emailVerified                                                             Boolean                       @default(false)
+  image                                                                     String?
+  createdAt                                                                 DateTime                      @db.Timestamptz(6)
+  updatedAt                                                                 DateTime                      @db.Timestamptz(6)
+  gender                                                                    String?
+  password_hash                                                             String?
+  account                                                                   account[]
+  contact_form_submissions                                                  contact_form_submissions[]
+  daily_test_clicks                                                         daily_test_clicks[]
+  newsletter_subscriptions                                                  newsletter_subscriptions[]
+  otp_verifications                                                         otp_verifications[]
+  scheduled_speaking_requests_scheduled_speaking_requests_receiver_idTouser scheduled_speaking_requests[] @relation("scheduled_speaking_requests_receiver_idTouser")
+  scheduled_speaking_requests_scheduled_speaking_requests_sender_idTouser   scheduled_speaking_requests[] @relation("scheduled_speaking_requests_sender_idTouser")
+  session                                                                   session[]
+  speaking_evaluation_data                                                  speaking_evaluation_data[]
+  speaking_requests_speaking_requests_receiver_idTouser                     speaking_requests[]           @relation("speaking_requests_receiver_idTouser")
+  speaking_requests_speaking_requests_sender_idTouser                       speaking_requests[]           @relation("speaking_requests_sender_idTouser")
+  speaking_room_invitations_speaking_room_invitations_invitee_idTouser      speaking_room_invitations[]   @relation("speaking_room_invitations_invitee_idTouser")
+  speaking_room_invitations_speaking_room_invitations_inviter_idTouser      speaking_room_invitations[]   @relation("speaking_room_invitations_inviter_idTouser")
+  speaking_room_likes_speaking_room_likes_liked_user_idTouser               speaking_room_likes[]         @relation("speaking_room_likes_liked_user_idTouser")
+  speaking_room_likes_speaking_room_likes_liker_idTouser                    speaking_room_likes[]         @relation("speaking_room_likes_liker_idTouser")
+  speaking_room_messages_speaking_room_messages_receiver_idTouser           speaking_room_messages[]      @relation("speaking_room_messages_receiver_idTouser")
+  speaking_room_messages_speaking_room_messages_sender_idTouser             speaking_room_messages[]      @relation("speaking_room_messages_sender_idTouser")
+  speaking_room_participants                                                speaking_room_participants[]
+  speaking_rooms                                                            speaking_rooms[]
+  test_scores                                                               test_scores[]
+  user_presence                                                             user_presence[]
+  writing_evaluation_data                                                   writing_evaluation_data[]
+}
+
+model user_presence {
+  id              String    @id @default(cuid())  // Add @default(cuid()) for auto-generation
+  userId          String    @unique  // Make sure this is unique for upsert to work
+  isOnline        Boolean   @default(false)
+  socketID        String?   @db.VarChar(100)
+  lastSeen        DateTime  @db.Timestamptz(6)
+  updatedAt       DateTime  @db.Timestamptz(6)
+  in_room         Boolean   @default(false)
+  room_code       String?   @db.VarChar(20)
+  room_created_at DateTime? @db.Timestamptz(6)
+  user            user      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([in_room])
+  @@index([room_code])
+}
+
+model verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @db.Timestamp(6)
+  createdAt  DateTime @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime @default(now()) @db.Timestamp(6)
+}
+
+model visitors {
+  id           BigInt   @id
+  ip_address   String   @db.VarChar(45)
+  country_name String?  @db.VarChar(100)
+  country_code String?  @db.VarChar(2)
+  city         String?  @db.VarChar(100)
+  region       String?  @db.VarChar(100)
+  current_page String?  @db.VarChar(500)
+  user_agent   String?
+  visit_count  Int      @default(1)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  last_updated DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([country_name])
+  @@index([created_at])
+  @@index([current_page])
+  @@index([ip_address])
+  @@index([last_updated])
+}
+
+model writing_evaluation_data {
+  id                 BigInt   @id
+  userId             String?
+  taskType           String
+  question           String
+  userAnswer         String
+  evaluationResponse String
+  wordCount          Int?
+  urlLink            String?
+  createdAt          DateTime @default(now()) @db.Timestamptz(6)
+  isLoggedIn         Boolean? @default(false)
+  user               user?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([taskType])
+  @@index([urlLink])
+  @@index([wordCount])
+}
+
+enum admin_role {
+  super_admin
+  admin
+}

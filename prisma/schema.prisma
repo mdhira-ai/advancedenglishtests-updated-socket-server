@@ -398,20 +398,22 @@ model user {
   speaking_room_participants                                                speaking_room_participants[]
   speaking_rooms                                                            speaking_rooms[]
   test_scores                                                               test_scores[]
-  user_presence                                                             user_presence[]
+  user_presence                                                             user_presence?
   writing_evaluation_data                                                   writing_evaluation_data[]
 }
 
 model user_presence {
-  id              String    @id @default(cuid())  // Add @default(cuid()) for auto-generation
-  userId          String    @unique  // Make sure this is unique for upsert to work
+  id              String    @id @default(cuid())
+  userId          String    @unique
   isOnline        Boolean   @default(false)
-  socketID        String?   @db.VarChar(100)
   lastSeen        DateTime  @db.Timestamptz(6)
   updatedAt       DateTime  @db.Timestamptz(6)
   in_room         Boolean   @default(false)
   room_code       String?   @db.VarChar(20)
   room_created_at DateTime? @db.Timestamptz(6)
+  socketID        String?   @db.VarChar(100)
+  peerID          String?   @db.VarChar(100)
+  call_status     String?   @db.VarChar(20)
   user            user      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([in_room])

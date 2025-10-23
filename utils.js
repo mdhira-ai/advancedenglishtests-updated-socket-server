@@ -54,6 +54,34 @@ async function disconnectUserSocketID(socketid) {
   }
 }
 
+async function setUserPeerID(userId, peerID) {
+  const prisma = new PrismaClient();
+
+  try {
+    await prisma.user_presence.upsert({
+      where: { userId: userId },
+      update: {
+        updatedAt: new Date(),
+        isOnline: true,
+        lastSeen: new Date(),
+        in_room: false,
+        peerID: peerID,
+      },
+      create: {
+        userId: userId,
+        updatedAt: new Date(),
+        isOnline: true,
+        lastSeen: new Date(),
+        in_room: false,
+        peerID: peerID,
+      },
+    });
+  } catch (error) {
+    console.error("Error setting user socket ID:", error);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
 
 
 async function disconnectSignout(socketid) {
@@ -80,4 +108,26 @@ async function disconnectSignout(socketid) {
 
 
 
-module.exports = { setUserSocketID, disconnectUserSocketID, disconnectSignout };
+async function findSocketByPeerId(peerId) {
+  const prisma = new PrismaClient();
+
+  try {
+    const userPresence = await prisma.user_presence.findMany({
+      where: { peerID: peerId },
+    });
+
+    if (userPresence && userPresence[0] && userPresence[0].socketID) {
+      return userPresence[0].socketID;
+    } else {
+      return null;
+    }
+  } catch (error) {
+    console.error("Error finding socket ID by user ID:", error);
+    return null;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+
+module.exports = { setUserSocketID, disconnectUserSocketID, disconnectSignout,setUserPeerID, findSocketByPeerId  };

@@ -198,7 +198,7 @@ model scheduled_speaking_requests {
 model session {
   id        String   @id
   expiresAt DateTime @db.Timestamp(6)
-  token     String
+  token     String   @unique
   createdAt DateTime @default(now()) @db.Timestamp(6)
   updatedAt DateTime @db.Timestamp(6)
   ipAddress String?
@@ -369,13 +369,13 @@ model test_scores {
 }
 
 model user {
-  id                                                                        String                        @id
+  id                                                                        String                           @id
   name                                                                      String
   email                                                                     String
-  emailVerified                                                             Boolean                       @default(false)
+  emailVerified                                                             Boolean                          @default(false)
   image                                                                     String?
-  createdAt                                                                 DateTime                      @db.Timestamptz(6)
-  updatedAt                                                                 DateTime                      @db.Timestamptz(6)
+  createdAt                                                                 DateTime                         @db.Timestamptz(6)
+  updatedAt                                                                 DateTime                         @db.Timestamptz(6)
   gender                                                                    String?
   password_hash                                                             String?
   account                                                                   account[]
@@ -383,18 +383,21 @@ model user {
   daily_test_clicks                                                         daily_test_clicks[]
   newsletter_subscriptions                                                  newsletter_subscriptions[]
   otp_verifications                                                         otp_verifications[]
-  scheduled_speaking_requests_scheduled_speaking_requests_receiver_idTouser scheduled_speaking_requests[] @relation("scheduled_speaking_requests_receiver_idTouser")
-  scheduled_speaking_requests_scheduled_speaking_requests_sender_idTouser   scheduled_speaking_requests[] @relation("scheduled_speaking_requests_sender_idTouser")
+  schedule_session_confirmations                                            schedule_session_confirmations[]
+  schedule_sessions_schedule_sessions_booker_idTouser                       schedule_sessions[]              @relation("schedule_sessions_booker_idTouser")
+  schedule_sessions_schedule_sessions_participant_idTouser                  schedule_sessions[]              @relation("schedule_sessions_participant_idTouser")
+  scheduled_speaking_requests_scheduled_speaking_requests_receiver_idTouser scheduled_speaking_requests[]    @relation("scheduled_speaking_requests_receiver_idTouser")
+  scheduled_speaking_requests_scheduled_speaking_requests_sender_idTouser   scheduled_speaking_requests[]    @relation("scheduled_speaking_requests_sender_idTouser")
   session                                                                   session[]
   speaking_evaluation_data                                                  speaking_evaluation_data[]
-  speaking_requests_speaking_requests_receiver_idTouser                     speaking_requests[]           @relation("speaking_requests_receiver_idTouser")
-  speaking_requests_speaking_requests_sender_idTouser                       speaking_requests[]           @relation("speaking_requests_sender_idTouser")
-  speaking_room_invitations_speaking_room_invitations_invitee_idTouser      speaking_room_invitations[]   @relation("speaking_room_invitations_invitee_idTouser")
-  speaking_room_invitations_speaking_room_invitations_inviter_idTouser      speaking_room_invitations[]   @relation("speaking_room_invitations_inviter_idTouser")
-  speaking_room_likes_speaking_room_likes_liked_user_idTouser               speaking_room_likes[]         @relation("speaking_room_likes_liked_user_idTouser")
-  speaking_room_likes_speaking_room_likes_liker_idTouser                    speaking_room_likes[]         @relation("speaking_room_likes_liker_idTouser")
-  speaking_room_messages_speaking_room_messages_receiver_idTouser           speaking_room_messages[]      @relation("speaking_room_messages_receiver_idTouser")
-  speaking_room_messages_speaking_room_messages_sender_idTouser             speaking_room_messages[]      @relation("speaking_room_messages_sender_idTouser")
+  speaking_requests_speaking_requests_receiver_idTouser                     speaking_requests[]              @relation("speaking_requests_receiver_idTouser")
+  speaking_requests_speaking_requests_sender_idTouser                       speaking_requests[]              @relation("speaking_requests_sender_idTouser")
+  speaking_room_invitations_speaking_room_invitations_invitee_idTouser      speaking_room_invitations[]      @relation("speaking_room_invitations_invitee_idTouser")
+  speaking_room_invitations_speaking_room_invitations_inviter_idTouser      speaking_room_invitations[]      @relation("speaking_room_invitations_inviter_idTouser")
+  speaking_room_likes_speaking_room_likes_liked_user_idTouser               speaking_room_likes[]            @relation("speaking_room_likes_liked_user_idTouser")
+  speaking_room_likes_speaking_room_likes_liker_idTouser                    speaking_room_likes[]            @relation("speaking_room_likes_liker_idTouser")
+  speaking_room_messages_speaking_room_messages_receiver_idTouser           speaking_room_messages[]         @relation("speaking_room_messages_receiver_idTouser")
+  speaking_room_messages_speaking_room_messages_sender_idTouser             speaking_room_messages[]         @relation("speaking_room_messages_sender_idTouser")
   speaking_room_participants                                                speaking_room_participants[]
   speaking_rooms                                                            speaking_rooms[]
   test_scores                                                               test_scores[]
@@ -466,6 +469,69 @@ model writing_evaluation_data {
   @@index([taskType])
   @@index([urlLink])
   @@index([wordCount])
+}
+
+model email_logs {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()"))
+  session_id          String?
+  recipient_email     String             @db.VarChar(255)
+  email_type          String             @db.VarChar(50)
+  sent_at             DateTime           @default(now()) @db.Timestamptz(6)
+  recipient_timezone  String?            @db.VarChar(100)
+  local_time_in_email String?
+  status              String             @default("sent") @db.VarChar(50)
+  schedule_sessions   schedule_sessions? @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@index([email_type])
+  @@index([recipient_email])
+  @@index([sent_at])
+  @@index([session_id])
+}
+
+model schedule_session_confirmations {
+  id                       String            @id @default(dbgenerated("gen_random_uuid()"))
+  session_id               String
+  user_id                  String
+  confirmed_at             DateTime?         @db.Timestamptz(6)
+  timezone_at_confirmation String?           @db.VarChar(100)
+  confirmation_method      String?           @db.VarChar(50)
+  schedule_sessions        schedule_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  user                     user              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([session_id, user_id])
+  @@index([session_id])
+  @@index([user_id])
+}
+
+model schedule_sessions {
+  id                                          String                           @id @default(dbgenerated("gen_random_uuid()"))
+  booker_id                                   String
+  participant_id                              String
+  scheduled_at_utc                            DateTime                         @db.Timestamptz(6)
+  duration_minutes                            Int?                             @default(60)
+  booker_timezone                             String?                          @db.VarChar(100)
+  participant_timezone                        String?                          @db.VarChar(100)
+  title                                       String?                          @db.VarChar(255)
+  description                                 String?
+  meeting_link                                String?                          @db.VarChar(500)
+  status                                      String                           @default("scheduled") @db.VarChar(50)
+  confirmation_token                          String?                          @unique @db.VarChar(255)
+  email_sent_at                               DateTime?                        @db.Timestamptz(6)
+  reminder_sent_at                            DateTime?                        @db.Timestamptz(6)
+  confirmed_at                                DateTime?                        @db.Timestamptz(6)
+  created_at                                  DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                                  DateTime                         @default(now()) @db.Timestamptz(6)
+  email_logs                                  email_logs[]
+  schedule_session_confirmations              schedule_session_confirmations[]
+  user_schedule_sessions_booker_idTouser      user                             @relation("schedule_sessions_booker_idTouser", fields: [booker_id], references: [id], onDelete: Cascade)
+  user_schedule_sessions_participant_idTouser user                             @relation("schedule_sessions_participant_idTouser", fields: [participant_id], references: [id], onDelete: Cascade)
+
+  @@index([booker_id])
+  @@index([confirmation_token])
+  @@index([created_at])
+  @@index([participant_id])
+  @@index([scheduled_at_utc])
+  @@index([status])
 }
 
 enum admin_role {

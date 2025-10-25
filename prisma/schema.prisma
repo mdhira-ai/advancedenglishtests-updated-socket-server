@@ -378,6 +378,8 @@ model user {
   updatedAt                                                                 DateTime                         @db.Timestamptz(6)
   gender                                                                    String?
   password_hash                                                             String?
+  Notifications_Notifications_actorIdTouser                                 Notifications[]                  @relation("Notifications_actorIdTouser")
+  Notifications_Notifications_userIdTouser                                  Notifications[]                  @relation("Notifications_userIdTouser")
   account                                                                   account[]
   contact_form_submissions                                                  contact_form_submissions[]
   daily_test_clicks                                                         daily_test_clicks[]
@@ -521,6 +523,7 @@ model schedule_sessions {
   confirmed_at                                DateTime?                        @db.Timestamptz(6)
   created_at                                  DateTime                         @default(now()) @db.Timestamptz(6)
   updated_at                                  DateTime                         @default(now()) @db.Timestamptz(6)
+  Notifications                               Notifications[]
   email_logs                                  email_logs[]
   schedule_session_confirmations              schedule_session_confirmations[]
   user_schedule_sessions_booker_idTouser      user                             @relation("schedule_sessions_booker_idTouser", fields: [booker_id], references: [id], onDelete: Cascade)
@@ -532,6 +535,19 @@ model schedule_sessions {
   @@index([participant_id])
   @@index([scheduled_at_utc])
   @@index([status])
+}
+
+model Notifications {
+  notificationId                   BigInt             @id @default(autoincrement())
+  type                             String
+  isRead                           Boolean            @default(false)
+  createdAt                        DateTime           @default(now())
+  userId                           String
+  actorId                          String
+  sessionId                        String?
+  user_Notifications_actorIdTouser user               @relation("Notifications_actorIdTouser", fields: [actorId], references: [id], onDelete: Cascade)
+  schedule_sessions                schedule_sessions? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user_Notifications_userIdTouser  user               @relation("Notifications_userIdTouser", fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum admin_role {

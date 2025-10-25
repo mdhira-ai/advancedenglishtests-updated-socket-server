@@ -43,6 +43,7 @@ async function disconnectUserSocketID(socketid) {
         isOnline: false,
         lastSeen: new Date(),
         in_room: false,
+        call_status: "idle",
       },
     });
 
@@ -95,6 +96,7 @@ async function disconnectSignout(socketid) {
         isOnline: false,
         lastSeen: new Date(),
         in_room: false,
+        call_status: "idle",
       },
     });
 
